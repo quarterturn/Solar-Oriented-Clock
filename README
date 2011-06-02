@@ -1,0 +1,23 @@
+Solar-Oriented Clock
+By Alexander Davis
+Copyright 2011
+Free License for Non-Commercial Use
+github@matrixwide.com
+
+Description:
+A clock which adjusts for DST per user-configurable schedule, computes sunrise, sunset and noon based on the long and lat coordinates and also displays the current moon phase.
+
+Software:
+Arduino 0022
+
+External Libraries:
+Timelord
+
+Hardware:
+Atmega328
+DS3231 RTC
+20x2 Noritake LCD-compatible VFD
+3v lithium coin cell for DS3231 backup power
+
+Feature of Note:
+Allows for per-digit setting and data validation.
