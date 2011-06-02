@@ -49,7 +49,7 @@
 #define TZ_LONG_LAT 1
 #define DST_START_END 2
 #define DISP_SCHED 3
-#define 12_24_MODE
+#define SET_12_24_MODE 4
 #define SET_DEFAULTS 5
 // to help remember which row is time and date
 #define TENS_HOURS 0
@@ -212,7 +212,7 @@ byte currentValue;
 byte menuMask[5][20] = {{1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1},
                         {1,1,1,0,1,1,1,1,0,1,1,0,1,1,1,0,1,1,0,1},
                         {1,1,0,0,1,0,0,1,0,1,1,0,0,1,0,0,1,0,1,1},
-                        {0,0,1,1,0,0,0,0,0,1,1,0,0,0,1,1,0,0,0,1}
+                        {0,0,1,1,0,0,0,0,0,1,1,0,0,0,1,1,0,0,0,1},
                         {0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1}};
 
 // menu values
@@ -1257,9 +1257,6 @@ void setDstStartEnd()
     // if the middle button is pressed,
     // call function to test if we are on the set field
     // and return the status of 1 (set) or 0 (ignore)
-    // if the middle button is pressed,
-    // call function to test if we are on the set field
-    // and return the status of 1 (set) or 0 (ignore)
     if ((centerButton.uniquePress()) && setButton(DST_START_END))
     {
       if (currentValue == 1)
@@ -1437,6 +1434,117 @@ void setDispSched()
   }
 }
 
+//---------------------------------------------------------------------------------------------//
+// function set1224Mode
+// displays the choices for 12/24 hour display mode
+//---------------------------------------------------------------------------------------------//
+void set1224Mode()
+{
+  byte setStatus = 0;
+
+  // clear the lcd
+  lcd.clear();
+
+  // move the LCD cursor to home
+  lcd.home();
+
+  // print the set time prompt to the display
+  lcd.print("USE 12 HOUR MODE");
+
+  // move the cursor to the bottom line left side
+  lcd.setCursor(0,1);
+
+  // turn on the cursor
+  lcd.cursor();
+
+  // set the array indexes to the same position
+  rowPos = 1;
+  colPos = 0;
+  
+  // write the current data to the display 
+  lcd.setCursor(12,1);
+  if (is12Hour)
+  {
+    lcd.print("YES");
+  }
+  else
+  {
+    lcd.print("NO");
+  }
+  lcd.setCursor(19,1);
+  lcd.print('*');
+
+  // move the cursor to the bottom line left side
+  lcd.setCursor(0,1);
+
+  // set currentValue to match the cursor position
+  currentValue = menuValues[0];
+  colPos = 0;
+
+  while (1)
+  {
+    // if the down button is pressed,
+    // decement the value so long as it is not out of range
+    // and it is in a position allowed to be changed
+    if ((downButton.uniquePress()) && (menuMask[SET_12_24_MODE][colPos]))
+    {
+      if ((colPos == 12) && (is12Hour == 1))
+      {
+        is12Hour == 0;
+        lcd.print("NO");
+        lcd.setCursor(colPos, 1);
+      }
+    }
+
+    // if the up button is pressed,
+    // increment the value so long as it is not more than the value mask
+    if (upButton.uniquePress() && menuMask[SET_12_24_MODE][colPos])
+    {
+      if ((colPos == 12) && (is12Hour == 0))
+      {
+        is12Hour == 1;
+        lcd.print("YES");
+        lcd.setCursor(colPos, 1);
+      }
+    }
+ 
+    // go right on right button,
+    // unless we are at the end of the array
+    if (rightButton.uniquePress())
+    {
+      moveRight(SET_12_24_MODE);
+    }
+
+    // go left on left button
+    // unless we are at the end of the array
+    if (leftButton.uniquePress())
+    {
+      moveLeft(SET_12_24_MODE);
+    }
+
+    // if we are on the set position
+    // middle button sets if 1 and discards if 0
+    if ((centerButton.uniquePress()) && setButton(SET_12_24_MODE))
+    {
+      if (currentValue == 1)
+      {
+        // write the values to the eeprom
+        EEPROM.write(EE_TIME_MODE, is12Hour);
+        
+        // turn off the cursor
+        lcd.noCursor();
+        // exit the set display schedule
+        return;
+        
+      }             
+      // turn off the cursor
+      lcd.noCursor();
+      // exit the set display schedule menu
+      return;
+    }
+  }
+}
+
 
 //---------------------------------------------------------------------------------------------//
 // function setMenu
@@ -1511,7 +1619,7 @@ void setMenu()
         lcd.clear();
         return;
         break;
-      case 12_24_MODE:
+      case SET_12_24_MODE:
         set1224Mode();
         lcd.clear();
         return;
@@ -1522,7 +1630,7 @@ void setMenu()
         return;
         break;
         // exit setting mode
-      case 5:
+      case 6:
         lcd.clear();
         return;
         break;
