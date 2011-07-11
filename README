@@ -4,6 +4,9 @@ Copyright 2011
 Free License for Non-Commercial Use
 github@matrixwide.com
 
+NOTE
+This project is currently under development. It compiles and it sort of works, but there are bugs!
+
 Description:
 A clock which adjusts for DST per user-configurable schedule, computes sunrise, sunset and noon based on the long and lat coordinates and also displays the current moon phase.
 
