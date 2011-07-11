@@ -790,6 +790,9 @@ void setTimeDate()
       lcd.noCursor();
       return;
     }
+    
+    // buttons do not seem to be debouncing properly
+    delay(100);
   }
 }
 
@@ -1861,14 +1864,6 @@ void displayTimeAndDate()
     lcd.display();
     lcd.vfdDim(0);
   }
-
-  // print the hour
-  // pad with a zero if less than ten hours 
-  // and 12 hour time is not set 
-  if ((theTime[2] < 10) & !(is12Hour))
-  {
-    lcd.print("0");
-  }
   
   // convert to 12 hour time if set
   if (is12Hour)
@@ -1883,6 +1878,20 @@ void displayTimeAndDate()
     {
       theTime[2] = theTime[2] - 12;
     }
+  }
+  
+  // print the hour
+  // pad with a zero if less than ten hours 
+  // and 12 hour time is not set 
+  if ((theTime[2] < 10) && !(is12Hour))
+  {
+    lcd.print("0");
+  }
+  // if 12 hour time is set pad with space
+  // if the tens hour is less than one
+  if ((theTime[2] < 10) && (is12Hour))
+  {
+    lcd.print(" ");
   }
     
   lcd.print(itoa(theTime[2], buf, 10));
@@ -2016,10 +2025,31 @@ void displayTimeAndDate()
     // theTime[2]
     lcd.write(31);
     tmpHr = sunRise[2];
-    if (tmpHr < 10)
+    
+    // convert to 12 hour time if set
+    if (is12Hour)
+    {
+      // convert 0 to 12
+      if (tmpHr == 0)
+      {
+        tmpHr = 12;
+      }
+      // if greater than 12 subtract 12
+      if (tmpHr > 12)
+      {
+        tmpHr = tmpHr - 12;
+      }
+    }
+    
+    if ((tmpHr < 10) && !(is12Hour))
     {
       lcd.print('0');
     }
+    if ((tmpHr < 10) && (is12Hour))
+    {
+      lcd.print(" ");
+    }
+    
     lcd.print(tmpHr, DEC);
     // minutes
     tmpMin = sunRise[1];
@@ -2036,10 +2066,31 @@ void displayTimeAndDate()
     // theTime[2]
     lcd.write(28);
     tmpHr = sunSet[2];
-    if (tmpHr < 10)
+    
+    // convert to 12 hour time if set
+    if (is12Hour)
+    {
+      // convert 0 to 12
+      if (tmpHr == 0)
+      {
+        tmpHr = 12;
+      }
+      // if greater than 12 subtract 12
+      if (tmpHr > 12)
+      {
+        tmpHr = tmpHr - 12;
+      }
+    }
+    
+    if ((tmpHr < 10) && !(is12Hour))
     {
       lcd.print('0');
     }
+    if ((tmpHr < 10) && (is12Hour))
+    {
+      lcd.print(" ");
+    }
+    
     lcd.print(tmpHr, DEC);
     // minutes
     tmpMin = sunSet[1];
@@ -2054,12 +2105,35 @@ void displayTimeAndDate()
     
     // noon
     lcd.write(148);
-    // hours
-    if (theNoon[2] < 10)
+   
+    tmpHr = theNoon[2];
+    
+    // convert to 12 hour time if set
+    if (is12Hour)
+    {
+      // convert 0 to 12
+      if (tmpHr == 0)
+      {
+        tmpHr = 12;
+      }
+      // if greater than 12 subtract 12
+      if (tmpHr > 12)
+      {
+        tmpHr = tmpHr - 12;
+      }
+    }
+    
+    if ((tmpHr < 10) && !(is12Hour))
     {
       lcd.print('0');
     }
-    lcd.print(theNoon[2], DEC);
+    if ((tmpHr < 10) && (is12Hour))
+    {
+      lcd.print(" ");
+    }
+    
+    lcd.print(tmpHr, DEC);
+    
     // minutes
     if (theNoon[1] < 10)
     {
@@ -2222,7 +2296,7 @@ void displayBigTimeAndDate()
         // top row
         lcd.setCursor((col + digit * 4), 0);
         // four spaces if the first digit is 0
-        if (digit == 0)
+        if ((digit == 0) && (hm[0] == 0))
         {
           lcd.write(' ');
         }
@@ -2234,7 +2308,7 @@ void displayBigTimeAndDate()
         // bottom row
         lcd.setCursor((col + digit * 4), 1);
         // four spaces if the first digit is 0
-        if (digit == 0)
+        if ((digit == 0) && (hm[0] == 0))
         {
           lcd.write(' ');
         }
@@ -2243,7 +2317,7 @@ void displayBigTimeAndDate()
           lcd.write(bn22[col + hm[digit] * 4]);
         }
       }
-      else
+      if (!(is12Hour))
       {
         // top row
         lcd.setCursor((col + digit * 4), 0);
@@ -2669,6 +2743,7 @@ void setDefaults()
   int defLong = -7878;
   
   // timezone and dst info
+  EEPROM.write(EE_TIME_ZONE, -5);
   EEPROM.write(EE_DST_MON_START, 3);
   EEPROM.write(EE_DST_DOW_START, 1);
   EEPROM.write(EE_DST_WEEK_START, 1);
@@ -2702,6 +2777,9 @@ void setDefaults()
 
   // automatic dst changeover flag
   EEPROM.write(EE_DST_ENABLE, 1);
+  
+  // set 24-hour mode
+  EEPROM.write(EE_TIME_MODE, 0);
   
   lcd.clear();
   lcd.home();
@@ -2751,14 +2829,14 @@ void calculateNoon()
   lcd.print("     Solar Clock    ");
   // move the cursor to the bottom line left side
   lcd.setCursor(0,1);
-  lcd.print("         v1.0       ");
+  lcd.print("         v1.3       ");
   delay(2000);
   lcd.clear();
   lcd.home();
-  lcd.print("  For George Davis  ");
+  lcd.print("    By Alex Davis   ");
   // move the cursor to the bottom line left side
   lcd.setCursor(0,1);
-  lcd.print("      5/25/2011     ");
+  lcd.print("      7/15/2011     ");
   delay(2000);
   lcd.clear();
 }
