@@ -28,9 +28,10 @@
 #include <avr/pgmspace.h>
 // for using atmega eeprom
 #include <EEPROM.h>
-
 // button press library
 #include <Button.h>
+// debounce library
+//#include <Bounce.h>
 // for LCD
 #include <LiquidCrystal.h>
 // for using i2c interface
@@ -91,6 +92,12 @@
 #define DST_END_WEEK 13
 #define DST_END_DAY 16
 #define DST_ENABLE 18
+// to help remember the display schedule settings
+#define SCHED_BRIGHT 2
+#define SCHED_DIM 9
+#define SCHED_OFF 14
+// to help remember the 12/24 hour settings
+#define MODE_12_24_HOUR 12
 // EEPROM memory locations for stored value
 #define EE_BIG_MODE 0
 #define EE_TIME_ZONE 1
@@ -212,8 +219,18 @@ byte currentValue;
 byte menuMask[5][20] = {{1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1},
                         {1,1,1,0,1,1,1,1,0,1,1,0,1,1,1,0,1,1,0,1},
                         {1,1,0,0,1,0,0,1,0,1,1,0,0,1,0,0,1,0,1,1},
-                        {0,0,1,1,0,0,0,0,0,1,1,0,0,0,1,1,0,0,0,1},
-                        {0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1}};
+                        {0,0,1,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1},
+                        {0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1}
+};
+                        
+// value mask
+// controls how large each value can be 0-9
+byte valueMask[4][20] = {
+  {2,9,0,5,9,0,5,9,0,1,9,0,3,9,0,9,9,0,7,1},
+  {1,1,9,0,1,1,9,9,0,9,9,0,1,9,9,0,9,9,0,1},
+  {1,9,0,0,4,0,0,7,0,1,9,0,0,4,0,0,7,0,1,1},
+  {0,0,2,9,0,0,0,0,0,2,9,0,0,0,2,9,0,0,0,1}
+};
 
 // menu values
 // temorarily stores values so that the user can change them one character at a time
@@ -478,12 +495,14 @@ void displaySettingData(byte menuNum)
 //---------------------------------------------------------------------------------------------//
 void decValue(byte menuNum)
 {
+  char buf[12];
+  
   if (currentValue > 0)
   {
     currentValue--;
     // handle the printing of +/- based on 1/0
     // for the tz, long & lat menu
-    if ((menuNum == 1) && ((colPos == 0) || (colPos == 4) || (colPos == 12)))
+    if ((menuNum == TZ_LONG_LAT) && ((colPos == TZ_SIGN) || (colPos == LONG_SIGN) || (colPos == LAT_SIGN)))
     {
       if (currentValue == 1)
       {
@@ -497,7 +516,19 @@ void decValue(byte menuNum)
     // otherwise just print whatever is in the array
     else
     {
-      lcd.write(48 + currentValue);
+      // need to add a space after the value for DISP_SCHED
+      // to clear going from double to single digit
+      if (menuNum == DISP_SCHED)
+      {
+        // convert the value to a string and display
+        lcd.print(itoa(currentValue, buf, 10));
+        lcd.print(" ");
+      }
+      else
+      {
+        // convert the value to a string and display
+        lcd.print(itoa(currentValue, buf, 10));
+      }
     }
     // move the cursor back since write moves it to the right
     lcd.setCursor(colPos,rowPos);
@@ -741,6 +772,18 @@ void setTimeDate()
             currentValue++;
           }
           break;
+        case TENS_YEAR:
+          if (checkYearValue())
+          {
+            currentValue++;
+          }
+          break;
+        case ONES_YEAR:
+          if (checkYearValue())
+          {
+            currentValue++;
+          }
+          break;
         case THE_DAY:
           if (currentValue < 7)
           {
@@ -791,8 +834,8 @@ void setTimeDate()
       return;
     }
     
-    // buttons do not seem to be debouncing properly
-    delay(100);
+    // button.h does not debounce
+    delay(50);
   }
 }
 
@@ -917,10 +960,14 @@ void setTzLongLat()
     // increment the value so long as it is not more than the value mask
     if (upButton.uniquePress() && menuMask[TZ_LONG_LAT][colPos])
     {
-      // more logic to keep values in range
-      switch (colPos)
-      {    
-        // tz value checks
+      if (currentValue < valueMask[TZ_LONG_LAT][colPos])
+      {
+        // more logic to keep values in range
+        switch (colPos)
+        {    
+          // tz value checks
+          // in each case the check is to see
+          // that all pieces add up to less than 12
         case TZ_TENS:
           if (checkTzValue())
           {
@@ -934,7 +981,9 @@ void setTzLongLat()
             currentValue++;
           }
           break;
-        //longitude value checks
+          //longitude value checks
+          // in each case the check is to see
+          // that all pieces add up to less than 18000
         case LONG_HUND:
           if (checkLongValue())
           {
@@ -965,7 +1014,9 @@ void setTzLongLat()
             currentValue++;
           }
           break;
-        // latitude value checks
+          // latitude value checks
+          // in each case the check is to see
+          // that all pieces add up to less than 9000
         case LAT_TENS:
           if (checkLatValue())
           {
@@ -990,15 +1041,31 @@ void setTzLongLat()
             currentValue++;
           }
           break;
-        case DONE:
-          if (currentValue < 1)
-          {
-            currentValue++;
-          }
-          break;
-        // otherwise do nothing
+          // otherwise just follow the valueMask value for colPos
         default:
-          break;
+          currentValue++;
+        }
+        // handle the printing of +/- based on 1/0
+        if ((colPos == 0) || (colPos == 4) || (colPos == 12))
+        {
+          if (currentValue == 1)
+          {
+            lcd.write('+');
+          }
+          if (currentValue == 0)
+          {
+            lcd.write('-');
+          }
+        }
+        // otherwise just print whatever is in the array
+        else
+        {
+          lcd.write(48 + currentValue);
+        }
+        // move the cursor back since write moves it to the right
+        lcd.setCursor(colPos,rowPos);
+        // update the menu value array
+        menuValues[colPos] = currentValue;
       }
       // handle the printing of +/- based on 1/0
       if ((colPos == 0) || (colPos == 4) || (colPos == 12))
@@ -1084,6 +1151,9 @@ void setTzLongLat()
       // exit the set tz, long and lat function
       return;  
     }
+    
+    // button.h does not debounce
+    delay(50);
   }
 }
 
@@ -1294,6 +1364,9 @@ void setDstStartEnd()
       // exit the set tz, long and lat function
       return;
     }
+    
+    // button.h does not debounce
+    delay(50);
   }
 }
 
@@ -1304,12 +1377,22 @@ void setDstStartEnd()
 void setDispSched()
 {
   byte setStatus = 0;
+  
+  char buf[12];
 
   // clear the lcd
   lcd.clear();
 
   // move the LCD cursor to home
   lcd.home();
+  
+  // reset the array
+  memset(menuValues, 0, (sizeof(menuValues)/sizeof(menuValues[0])));
+  
+  // load the array with the current values
+  menuValues[SCHED_BRIGHT] = brightHour;
+  menuValues[SCHED_DIM] = dimHour;
+  menuValues[SCHED_OFF] = offHour;
 
   // print the set time prompt to the display
   lcd.print("BRIGHT  DIM  OFF");
@@ -1325,6 +1408,8 @@ void setDispSched()
   colPos = 0;
   
   // write the current data to the display 
+  // we're storing the whole value in one array byte
+  // so we can't use displaySettingData()
   lcd.setCursor(2,1);
   lcd.print(brightHour, DEC);
   lcd.setCursor(9,1);
@@ -1348,54 +1433,57 @@ void setDispSched()
     // and it is in a position allowed to be changed
     if ((downButton.uniquePress()) && (menuMask[DISP_SCHED][colPos]))
     {
-      if (((colPos == 2) || (colPos == 4)) && (brightHour > 0))
-      {
-        brightHour--;
-        lcd.print(brightHour, DEC);
-        lcd.print(' ');
-        lcd.setCursor(colPos, 1);
-      }
-      if (((colPos == 9) || (colPos == 10)) && (dimHour > 0))
-      {
-        dimHour--;
-        lcd.print(dimHour, DEC);
-        lcd.print(' ');
-        lcd.setCursor(colPos, 1);
-      }
-      if (((colPos == 14) || (colPos == 15)) && (dimHour > 0))
-      {
-        offHour--;
-        lcd.print(offHour, DEC);
-        lcd.print(' ');
-        lcd.setCursor(colPos, 1);
-      }
+      decValue(DISP_SCHED);
     }
 
     // if the up button is pressed,
     // increment the value so long as it is not more than the value mask
     if (upButton.uniquePress() && menuMask[DISP_SCHED][colPos])
     {
-      if (((colPos == 2) || (colPos == 4)) && (brightHour < 23))
-      {
-        brightHour++;
-        lcd.print(brightHour, DEC);
-        lcd.print(' ');
-        lcd.setCursor(colPos, 1);
+      // more logic to keep values in range
+      switch (colPos)
+      {    
+        // display schedule checks
+        // bright time check
+        case SCHED_BRIGHT:
+          if (currentValue < 23)
+          {
+            currentValue++;
+          }
+          break;
+        // dim time check
+        case SCHED_DIM:
+          if (currentValue < 23)
+          {
+            currentValue++;
+          }
+          break;
+        // off time check
+        case SCHED_OFF:
+          if (currentValue < 23)
+          {
+            currentValue++;
+          }
+          break;
+        // set or not position - done
+        case DONE:
+          if (currentValue < 1)
+          {
+            currentValue++;
+          }
+          break;
+        // otherwise do nothing
+        default:
+          break;
       }
-      if (((colPos == 9) || (colPos == 10)) && (dimHour < 23))
-      {
-        dimHour++;
-        lcd.print(dimHour, DEC);
-        lcd.print(' ');
-        lcd.setCursor(colPos, 1);
-      }
-      if (((colPos == 14) || (colPos == 15)) && (dimHour < 23))
-      {
-        offHour++;
-        lcd.print(offHour, DEC);
-        lcd.print(' ');
-        lcd.setCursor(colPos, 1);
-      }
+
+      // convert the value to a string and display
+      lcd.print(itoa(currentValue, buf, 10));
+      lcd.print(" ");
+      // move the cursor back since write moves it to the right
+      lcd.setCursor(colPos,rowPos);
+      // update the menu value array
+      menuValues[colPos] = currentValue;
     }
  
     // go right on right button,
@@ -1418,6 +1506,11 @@ void setDispSched()
     {
       if (currentValue == 1)
       {
+        // refresh the current values with the array values
+        brightHour = menuValues[SCHED_BRIGHT];
+        dimHour = menuValues[SCHED_DIM];
+        offHour = menuValues[SCHED_OFF];
+        
         // write the values to the eeprom
         EEPROM.write(EE_BRIGHT_HR, brightHour);
         EEPROM.write(EE_DIM_HR, dimHour);
@@ -1434,6 +1527,8 @@ void setDispSched()
       // exit the set display schedule menu
       return;
     }
+     // button.h does not debounce
+    delay(50);
   }
 }
 
@@ -1450,6 +1545,9 @@ void set1224Mode()
 
   // move the LCD cursor to home
   lcd.home();
+  
+  // reset the array
+  memset(menuValues, 0, (sizeof(menuValues)/sizeof(menuValues[0])));
 
   // print the set time prompt to the display
   lcd.print("USE 12 HOUR MODE");
@@ -1469,10 +1567,12 @@ void set1224Mode()
   if (is12Hour)
   {
     lcd.print("YES");
+    menuValues[MODE_12_24_HOUR] = 1;
   }
   else
   {
-    lcd.print("NO");
+    lcd.print("NO ");
+    menuValues[MODE_12_24_HOUR] = 0;
   }
   lcd.setCursor(19,1);
   lcd.print('*');
@@ -1491,23 +1591,61 @@ void set1224Mode()
     // and it is in a position allowed to be changed
     if ((downButton.uniquePress()) && (menuMask[SET_12_24_MODE][colPos]))
     {
-      if ((colPos == 12) && (is12Hour == 1))
-      {
-        is12Hour == 0;
-        lcd.print("NO");
-        lcd.setCursor(colPos, 1);
+      // more logic to keep values in range
+      switch (colPos)
+      {    
+        // 12 hour enable position
+        case MODE_12_24_HOUR:
+          if (currentValue > 0)
+          {
+            currentValue--;
+            lcd.print("NO ");
+            lcd.setCursor(colPos,rowPos);
+          }
+          break;
+        // set or not position - done
+        case DONE:
+          if (currentValue > 0)
+          {
+            currentValue++;
+            lcd.print("0");
+            lcd.setCursor(colPos,rowPos);
+          }
+          break;
+        // otherwise do nothing
+        default:
+          break;
       }
     }
-
+    
     // if the up button is pressed,
     // increment the value so long as it is not more than the value mask
     if (upButton.uniquePress() && menuMask[SET_12_24_MODE][colPos])
     {
-      if ((colPos == 12) && (is12Hour == 0))
-      {
-        is12Hour == 1;
-        lcd.print("YES");
-        lcd.setCursor(colPos, 1);
+      // more logic to keep values in range
+      switch (colPos)
+      {    
+        // 12 hour enable position
+        case MODE_12_24_HOUR:
+          if (currentValue < 1)
+          {
+            currentValue++;
+            lcd.print("YES");
+            lcd.setCursor(colPos,rowPos);
+          }
+          break;
+        // set or not position - done
+        case DONE:
+          if (currentValue < 1)
+          {
+            currentValue++;
+            lcd.print("1");
+            lcd.setCursor(colPos,rowPos);
+          }
+          break;
+        // otherwise do nothing
+        default:
+          break;
       }
     }
  
@@ -1531,9 +1669,9 @@ void set1224Mode()
     {
       if (currentValue == 1)
       {
+        is12Hour = menuValues[MODE_12_24_HOUR];
         // write the values to the eeprom
         EEPROM.write(EE_TIME_MODE, is12Hour);
-        
         // turn off the cursor
         lcd.noCursor();
         // exit the set display schedule
@@ -1545,6 +1683,10 @@ void set1224Mode()
       // exit the set display schedule menu
       return;
     }
+    
+    menuValues[colPos] = currentValue;
+    // button.h does not debounce
+    delay(50);
   }
 }
 
@@ -1639,7 +1781,9 @@ void setMenu()
         break;
       }
     }
-    delay(100);
+    
+    // button.h does not debounce
+    delay(50);
   } 
 }
 //---------------------------------------------------------------------------------------------//
@@ -1865,36 +2009,37 @@ void displayTimeAndDate()
     lcd.vfdDim(0);
   }
   
+  tmpHr = theTime[2];
   // convert to 12 hour time if set
   if (is12Hour)
   {
     // convert 0 to 12
-    if (theTime[2] == 0)
+    if (tmpHr == 0)
     {
-      theTime[2] = 12;
+      tmpHr = 12;
     }
     // if greater than 12 subtract 12
-    if (theTime[2] > 12)
+    if (tmpHr > 12)
     {
-      theTime[2] = theTime[2] - 12;
+      tmpHr = tmpHr - 12;
     }
   }
   
   // print the hour
   // pad with a zero if less than ten hours 
   // and 12 hour time is not set 
-  if ((theTime[2] < 10) && !(is12Hour))
+  if ((tmpHr < 10) && !(is12Hour))
   {
     lcd.print("0");
   }
   // if 12 hour time is set pad with space
   // if the tens hour is less than one
-  if ((theTime[2] < 10) && (is12Hour))
+  if ((tmpHr < 10) && (is12Hour))
   {
     lcd.print(" ");
   }
     
-  lcd.print(itoa(theTime[2], buf, 10));
+  lcd.print(itoa(tmpHr, buf, 10));
   lcd.print(":");
 
   // print the minutes
@@ -2215,6 +2360,8 @@ void displayBigTimeAndDate()
   byte col;
   // array to hold hours and minutes as digits
   byte hm[4];
+  // to hold the time for 12 hour
+  byte tmpHr;
 
   char buf[12];
 
@@ -2237,25 +2384,26 @@ void displayBigTimeAndDate()
   // 4 month
   // 5 year
   
+  tmpHr = theTime[2];
   // convert to 12 hour time if set
   if (is12Hour)
   {
     // convert 0 to 12
-    if (theTime[2] == 0)
+    if (tmpHr == 0)
     {
-      theTime[2] = 12;
+      tmpHr = 12;
     }
     // if greater than 12 subtract 12
-    if (theTime[2] > 12)
+    if (tmpHr > 12)
     {
-      theTime[2] = theTime[2] - 12;
+      tmpHr = tmpHr - 12;
     }
   }
   
   // tens hours
-  hm[0] = theTime[2] / 10;
+  hm[0] = tmpHr / 10;
   // ones hours
-  hm[1] = theTime[2] % 10;
+  hm[1] = tmpHr % 10;
   // tens minutes
   hm[2] = theTime[1] / 10;
   // ones minutes
@@ -2546,14 +2694,24 @@ void lcdCustomChars()
 // returns 1 if less than, 0 otherwise
 //---------------------------------------------------------------------------------------------//
 byte checkHourValue()
-{
-  int currHr;
-  
-  currHr = 10 * menuValues[TENS_HOURS] + menuValues[ONES_HOURS];
-  
-  if (currHr < 23)
+{ 
+  // test the value mask first
+  if (currentValue < valueMask[TIME_DATE][colPos])
   {
-    return 1;
+    // if we add one to the tens will it exceed 24?
+    if ((colPos == TENS_HOURS) && ((10 * (1 + menuValues[TENS_HOURS]) + menuValues[ONES_HOURS]) < 24))
+    {
+      return 1;
+    }
+    // if we add one to the ones will it exceed 24?
+    else if ((colPos == ONES_HOURS) && ((10 * menuValues[TENS_HOURS] + menuValues[ONES_HOURS] + 1) < 24))
+    {
+      return 1;
+    }
+    else
+    {
+      return 0;
+    }
   }
   else
   {
@@ -2568,13 +2726,23 @@ byte checkHourValue()
 //---------------------------------------------------------------------------------------------//
 byte checkMinuteValue()
 {
-  int currMin;
-  
-  currMin = 10 * menuValues[TENS_MINUTES] + menuValues[ONES_MINUTES];
-  
-  if (currMin < 59)
+  // test the value mask first
+  if (currentValue < valueMask[TIME_DATE][colPos])
   {
-    return 1;
+    // if we add one to the tens will it exceed 60?
+    if ((colPos == TENS_MINUTES) && ((10 * (1 + menuValues[TENS_MINUTES]) + menuValues[ONES_MINUTES]) < 60))
+    {
+      return 1;
+    }
+    // if we add one to the ones will it exceed 60?
+    else if ((colPos == ONES_MINUTES) && ((10 * menuValues[TENS_MINUTES] + menuValues[ONES_MINUTES] + 1) < 60))
+    {
+      return 1;
+    }
+    else
+    {
+      return 0;
+    }
   }
   else
   {
@@ -2589,13 +2757,23 @@ byte checkMinuteValue()
 //---------------------------------------------------------------------------------------------//
 byte checkSecondValue()
 {
-  int currSec;
-  
-  currSec = 10 * menuValues[TENS_SECONDS] + menuValues[ONES_SECONDS];
-  
-  if (currSec < 59)
+  // test the value mask first
+  if (currentValue < valueMask[TIME_DATE][colPos])
   {
-    return 1;
+    // if we add one to the tens will it exceed 59?
+    if ((colPos == TENS_SECONDS) && ((10 * (1 + menuValues[TENS_SECONDS]) + menuValues[ONES_SECONDS]) < 60))
+    {
+      return 1;
+    }
+    // if we add one to the ones will it exceed 59?
+    else if ((colPos == ONES_SECONDS) && ((10 * menuValues[TENS_SECONDS] + menuValues[ONES_SECONDS] + 1) < 60))
+    {
+      return 1;
+    }
+    else
+    {
+      return 0;
+    }
   }
   else
   {
@@ -2610,13 +2788,23 @@ byte checkSecondValue()
 //---------------------------------------------------------------------------------------------//
 byte checkMonthValue()
 {
-  int currMonth;
-  
-  currMonth = 10 * menuValues[TENS_MONTH] + menuValues[ONES_MONTH];
-  
-  if (currMonth < 12)
+  // test the value mask first
+  if (currentValue < valueMask[TIME_DATE][colPos])
   {
-    return 1;
+    // if we add one to the tens will it exceed 12?
+    if ((colPos == TENS_MONTH) && ((10 * (1 + menuValues[TENS_MONTH]) + menuValues[ONES_MONTH]) < 13))
+    {
+      return 1;
+    }
+    // if we add one to the ones will it exceed 12?
+    else if ((colPos == ONES_MONTH) && ((10 * menuValues[TENS_MONTH] + menuValues[ONES_MONTH] + 1) < 13))
+    {
+      return 1;
+    }
+    else
+    {
+      return 0;
+    }
   }
   else
   {
@@ -2626,18 +2814,31 @@ byte checkMonthValue()
 
 //---------------------------------------------------------------------------------------------//
 // function checkDayValue
-// checks menuValues[] for days recomibined are less than 12
+// checks menuValues[] for days recomibined are less than 31
 // returns 1 if less than, 0 otherwise
 //---------------------------------------------------------------------------------------------//
 byte checkDayValue()
 {
-  int currDay;
-  
-  currDay = 10 * menuValues[TENS_DATE] + menuValues[ONES_DATE];
-  
-  if (currDay < 31)
+  // test the value mask first
+  if (currentValue < valueMask[TIME_DATE][colPos])
   {
-    return 1;
+    // note
+    // if the user wants to set February 31 they can do it
+    
+    // if we add one to the tens will it exceed 31?
+    if ((colPos == TENS_DATE) && ((10 * (1 + menuValues[TENS_DATE]) + menuValues[ONES_DATE]) < 32))
+    {
+      return 1;
+    }
+    // if we add one to the ones will it exceed 31?
+    else if ((colPos == ONES_DATE) && ((10 * menuValues[TENS_DATE] + menuValues[ONES_DATE] + 1) < 32))
+    {
+      return 1;
+    }
+    else
+    {
+      return 0;
+    }
   }
   else
   {
@@ -2652,13 +2853,19 @@ byte checkDayValue()
 //---------------------------------------------------------------------------------------------//
 byte checkYearValue()
 {
-  int currYear;
-  
-  currYear = 10 * menuValues[TENS_YEAR] + menuValues[ONES_YEAR];
-  
-  if (currYear < 99)
+  // test the value mask first
+  if (currentValue < valueMask[TIME_DATE][colPos])
   {
-    return 1;
+    // both digits can be 9 so the test is much easier
+    // just see if it combines to less than 99
+    if ((10 * menuValues[TENS_YEAR] + menuValues[ONES_YEAR]) < 99)
+    {
+      return 1;
+    }
+    else
+    {
+      return 0;
+    }
   }
   else
   {
@@ -2669,6 +2876,8 @@ byte checkYearValue()
 //---------------------------------------------------------------------------------------------//
 // function checkTzValue
 // checks menuValues[] recomibined are less than 12
+// I think this is easier than figuring out the logic of how each digit interacts
+// when checking more than two digits
 // we don't care about the sign
 // returns 1 if less than, 0 otherwise
 //---------------------------------------------------------------------------------------------//
