@@ -5,7 +5,8 @@ Free License for Non-Commercial Use
 github@matrixwide.com
 
 NOTE
-This project is currently under development. It compiles and it sort of works, but there are bugs!
+Things to fix:
+The big/small display button clashes with the SQW pin input to 13. Lame workaround is to let run mode buttons bounce. Probably can be fixed by chaning Button.h to Bounce.h and triggering on edge transition for the SQW pin.
 
 Description:
 A clock which adjusts for DST per user-configurable schedule, computes sunrise, sunset and noon based on the long and lat coordinates and also displays the current moon phase.
