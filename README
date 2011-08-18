@@ -5,8 +5,7 @@ Free License for Non-Commercial Use
 github@matrixwide.com
 
 NOTE
-Things to fix:
-Updated button library to Bounce.h. However, I checked pin 13 with the scope and found that it is not outputting a 1 HZ squarewave. While figuring that out, I changed the time display update to a half-second polling period.
+Updated button library to Bounce.h.
 
 Description:
 A clock which adjusts for DST per user-configurable schedule, computes sunrise, sunset and noon based on the long and lat coordinates and also displays the current moon phase.

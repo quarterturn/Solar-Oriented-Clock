@@ -128,10 +128,6 @@ Bounce centerButton = Bounce(7, 10);
 Bounce leftButton = Bounce(6, 10);
 Bounce timeReady = Bounce(13, 10);
 
-//boolean timeReadyChanged;
-// delay loop counter
-unsigned long previousMillis;
-
 // global variables
 byte currentByte;
 
@@ -407,68 +403,70 @@ void setup()
 //---------------------------------------------------------------------------------------------//
 void loop()
 {
-  if (bigMode)
+  // DS3231 sends 1 Hz 50% duty cycle signal to pin 13
+  // trigger on the edge of going low
+  if (timeReady.update())
   {
-    displayBigTimeAndDate();
+    if (timeReady.fallingEdge())
+    {
+      if (bigMode)
+      {
+        displayBigTimeAndDate();
+      }
+      else
+      {
+        displayTimeAndDate();
+      }
+    }
   }
-  else
+
+  // center button is set
+  if (centerButton.update())
   {
-    displayTimeAndDate();
+    if ((centerButton.read()) == LOW)
+    {
+      setMenu();
+    }
   }
   
-  previousMillis = millis();
-  // update the time twice per second
-  // SQW is not working at the moment
-  while (millis() - previousMillis < 500)
+  // toggle big or small display mode based on up button
+  if (upButton.update() && (bigMode == 0))
   {
-    // center button is set
-    if (centerButton.update())
+    if ((upButton.read()) == LOW)
     {
-      if ((centerButton.read()) == LOW)
-      {
-        setMenu();
-      }
+      bigMode = 1;
+      EEPROM.write(EE_BIG_MODE, 1);
+      lcd.clear();
     }
-    
-    // toggle big or small display mode based on up button
-    if (upButton.update() && (bigMode == 0))
+  }
+  if (upButton.update() && (bigMode == 1))
+  {
+    if ((upButton.read()) == LOW)
     {
-      if ((upButton.read()) == LOW)
-      {
-        bigMode = 1;
-        EEPROM.write(EE_BIG_MODE, 1);
-        lcd.clear();
-      }
+      bigMode = 0;
+      EEPROM.write(EE_BIG_MODE, 0);
+      lcd.clear();
     }
-    if (upButton.update() && (bigMode == 1))
+  }
+  // toggle display on or off based on down button
+  // we don't track this in eeprom
+  // the idea is you turn it off temporarily
+  // for example you go to bed early and want the display off
+  if (downButton.update())
+  {
+    if ((downButton.read()) == LOW)
     {
-      if ((upButton.read()) == LOW)
+      if (displayOn)
       {
-        bigMode = 0;
-        EEPROM.write(EE_BIG_MODE, 0);
-        lcd.clear();
+        // turn off the display
+        lcd.noDisplay();
+        displayOn = 0;
       }
-    }
-    // toggle display on or off based on down button
-    // we don't track this in eeprom
-    // the idea is you turn it off temporarily
-    // for example you go to bed early and want the display off
-    if (downButton.update())
-    {
-      if ((downButton.read()) == LOW)
+      else
       {
-        if (displayOn)
-        {
-          // turn off the display
-          lcd.noDisplay();
-          displayOn = 0;
-        }
-        else
-        {
-          // turn on the display
-          lcd.display();
-          displayOn = 1;
-        }
+        // turn on the display
+        lcd.display();
+        displayOn = 1;
       }
     }
   }
@@ -2629,19 +2627,8 @@ byte bcdToDec(byte val)
 void SQWEnable()
 {
   Wire.beginTransmission(DS3231_I2C_ADDRESS);
-  Wire.send(0x0E);
-  Wire.endTransmission();
-  Wire.requestFrom(DS3231_I2C_ADDRESS, 1);
-  uint8_t register0E = Wire.receive();
-  
-  // clear bits 3 and 4 for 1Hz
-  register0E &= ~(1 << 3);
-  register0E &= ~(1 << 4);
-  
-  // put the value of the register back
-  Wire.beginTransmission(DS3231_I2C_ADDRESS);
   Wire.send(0x0e);
-  Wire.send(register0E);
+  Wire.send(0);
   Wire.endTransmission();
 }
 
