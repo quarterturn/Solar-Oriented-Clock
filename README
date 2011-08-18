@@ -6,7 +6,7 @@ github@matrixwide.com
 
 NOTE
 Things to fix:
-The big/small display button clashes with the SQW pin input to 13. Lame workaround is to let run mode buttons bounce. Probably can be fixed by chaning Button.h to Bounce.h and triggering on edge transition for the SQW pin.
+Updated button library to Bounce.h. However, I checked pin 13 with the scope and found that it is not outputting a 1 HZ squarewave. While figuring that out, I changed the time display update to a half-second polling period.
 
 Description:
 A clock which adjusts for DST per user-configurable schedule, computes sunrise, sunset and noon based on the long and lat coordinates and also displays the current moon phase.
@@ -15,7 +15,15 @@ Software:
 Arduino 0022
 
 External Libraries:
-Timelord
+#include <avr/pgmspace.h>
+// for using atmega eeprom
+#include <EEPROM.h>
+// debounced button library
+#include <Bounce.h>
+// for LCD
+#include <LiquidCrystal.h>
+// for using i2c interface
+#include <Wire.h>
 
 Hardware:
 Atmega328
