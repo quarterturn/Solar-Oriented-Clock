@@ -248,6 +248,8 @@ prog_char menu3[] PROGMEM = "SET DISPLAY SCHEDULE";
 prog_char menu4[] PROGMEM = "SET 12/24 HR MODE";
 prog_char menu5[] PROGMEM = "SET DEFAULTS";
 prog_char menu6[] PROGMEM = "DONE";
+prog_char menu7[] PROGMEM = "Solar Clock    1.4";
+prog_char menu8[] PROGMEM = "Alex Davis 9/12/11";
 
 // an array of menu strings stored in FLASH
 PROGMEM  const char *menuStrSet[] = {
@@ -257,8 +259,13 @@ PROGMEM  const char *menuStrSet[] = {
   menu3,
   menu4,
   menu5,
-  menu6
+  menu6,
+  menu7,
+  menu8
 };
+
+// a string for PROGMEM values
+char currentString[20];
 
 // create a TimeLord object
 TimeLord myLord;
@@ -1782,7 +1789,6 @@ void set1224Mode()
 //---------------------------------------------------------------------------------------------//
 void setMenu()
 {
-  char currentString[20];
   byte menuNum = 0;
   
   // turn on the lcd
@@ -2214,46 +2220,8 @@ void displayTimeAndDate()
   // move the cursor to the bottom line left side
   lcd.setCursor(0,1);
   
-  // update the sunrise, noon, sunset and moon at 0000:01
-  if ((theTime[2] == 0) && (theTime[2] == 0) && (theTime[0] == 1))
-  {
-    // set the sunRise array
-    sunRise[0] = 0;
-    sunRise[1] = 0;
-    sunRise[2] = 0;
-    sunRise[3] = theTime[3];
-    sunRise[4] = theTime[4];
-    sunRise[5] = theTime[5];
-    
-    // call the SunRise method and get the return result
-    // so we can tell if the sun actually rises
-    sunWillRise = myLord.SunRise(sunRise);
-    
-    // set the sunSet array
-    sunSet[0] = 0;
-    sunSet[1] = 0;
-    sunSet[2] = 0;
-    sunSet[3] = theTime[3];
-    sunSet[4] = theTime[4];
-    sunSet[5] = theTime[5];
-    
-    // call the sunSet method
-    myLord.SunSet(sunSet);
-    
-    // call the MoonPhase method
-    moonPhase = myLord.MoonPhase(sunRise);
-    
-    // calculate noon
-    calculateNoon();
-    
-    // convert time to dst if enabled
-    if (dstEnable)
-    {
-      myLord.DST(sunRise);
-      myLord.DST(sunSet);
-      myLord.DST(theNoon);
-    }
-  }
+  // update the solar values
+  updateSolar();
   
   // print the sunrise, sunset and noon if the sun rises
   if (sunWillRise)
@@ -2521,7 +2489,10 @@ void displayBigTimeAndDate()
     lcd.display();
     lcd.vfdDim(1);
   }
-
+  
+  // update the solar data
+  updateSolar();
+  
   // start at upper left
   lcd.setCursor(0, 0);
 
@@ -2639,8 +2610,9 @@ void SQWEnable()
 void lcdCustomChars()
 {
   // big number data
-  // for some reason the lowest line for the LR and LL characters does not
-  // work correctly on my Noritake VFD
+  // the lowest line for the LR and LL characters does not
+  // work correctly on my Noritake VFD as they are hardwired to be a cursor line
+  // this should probably be moved to the flash via PROGMEM
   byte LT[8] =
   {
     B00111,
@@ -2738,6 +2710,121 @@ void lcdCustomChars()
   lcd.createChar(5,LR);
   lcd.createChar(6,MB);
   lcd.createChar(7,block);
+
+//  // counter
+//  int cCount = 0;
+//
+//  // string to hold custom char data from flash
+//  char theCustChar[8];
+//  
+//  // use PROGMEM
+//  prog_char custChar0[] PROGMEM = 
+//  {
+//    B00111,
+//    B01111,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111
+//  };
+//  prog_char custChar1[] PROGMEM =
+//  {
+//    B11111,
+//    B11111,
+//    B11111,
+//    B00000,
+//    B00000,
+//    B00000,
+//    B00000,
+//    B00000
+//  };
+//  prog_char custChar2[] PROGMEM =
+//  {
+//    B11100,
+//    B11110,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111
+//  };
+//  prog_char custChar3[] PROGMEM =
+//  {
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B01111,
+//    B00111
+//  };
+//  prog_char custChar4[] PROGMEM =
+//  {
+//    B00000,
+//    B00000,
+//    B00000,
+//    B00000,
+//    B00000,
+//    B11111,
+//    B11111,
+//    B11111
+//  };
+//  prog_char custChar5[] PROGMEM =
+//  {
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11110,
+//    B00000
+//  };
+//  prog_char custChar6[] PROGMEM =
+//  {
+//    B11111,
+//    B11111,
+//    B11111,
+//    B00000,
+//    B00000,
+//    B00000,
+//    B11111,
+//    B11111
+//  };
+//  prog_char custChar7[] PROGMEM =
+//  {
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111,
+//    B11111
+//  };
+//  
+//  // an array of menu strings stored in FLASH
+//  PROGMEM  const char *custCharSet[] = {
+//    custChar0,
+//    custChar1,
+//    custChar2,
+//    custChar3,
+//    custChar4,
+//    custChar5,
+//    custChar6,
+//    custChar7
+//  };
+//  
+//  // read the strings out of flash and into the display custom character RAM
+//  for (cCount = 0; cCount > 8; cCount++);
+//  { 
+//    strcpy_P(theCustChar, (char*)pgm_read_word(&(custCharSet[cCount])));
+//    lcd.createChar(cCount,theCustChar);
+//  }
 
 }
 
@@ -3088,17 +3175,62 @@ void calculateNoon()
 { 
   lcd.clear();
   lcd.home();
-  lcd.print("     Solar Clock    ");
+  // default to time and date menu
+  strcpy_P(currentString, (char*)pgm_read_word(&(menuStrSet[7])));
+  lcd.print(currentString);
   // move the cursor to the bottom line left side
   lcd.setCursor(0,1);
-  lcd.print("         v1.4       ");
-  delay(2000);
+  strcpy_P(currentString, (char*)pgm_read_word(&(menuStrSet[8])));
+  lcd.print(currentString);
+  delay(3000);
   lcd.clear();
-  lcd.home();
-  lcd.print("    By Alex Davis   ");
-  // move the cursor to the bottom line left side
-  lcd.setCursor(0,1);
-  lcd.print("      8/17/2011     ");
-  delay(2000);
-  lcd.clear();
+}
+
+//---------------------------------------------------------------------------------------------//
+// function updateSolar()
+// updates solar information
+//---------------------------------------------------------------------------------------------//
+void updateSolar()
+{
+  // update the sunrise, noon, sunset and moon twice daily
+  //if (((theTime[1] == 0) && (theTime[0] == 0)) && ((theTime[2] == 17) || (theTime[2] == 4)))
+  if ((theTime[1] == 0) && (theTime[0] == 0) && (theTime[2] == 0))
+  {
+    // set the sunRise array
+    sunRise[0] = 0;
+    sunRise[1] = 0;
+    sunRise[2] = 0;
+    sunRise[3] = theTime[3];
+    sunRise[4] = theTime[4];
+    sunRise[5] = theTime[5];
+    
+    // call the SunRise method and get the return result
+    // so we can tell if the sun actually rises
+    sunWillRise = myLord.SunRise(sunRise);
+    
+    // set the sunSet array
+    sunSet[0] = 0;
+    sunSet[1] = 0;
+    sunSet[2] = 0;
+    sunSet[3] = theTime[3];
+    sunSet[4] = theTime[4];
+    sunSet[5] = theTime[5];
+    
+    // call the sunSet method
+    myLord.SunSet(sunSet);
+    
+    // call the MoonPhase method
+    moonPhase = myLord.MoonPhase(sunRise);
+    
+    // calculate noon
+    calculateNoon();
+    
+    // convert time to dst if enabled
+    if (dstEnable)
+    {
+      myLord.DST(sunRise);
+      myLord.DST(sunSet);
+      myLord.DST(theNoon);
+    }
+  }
 }
