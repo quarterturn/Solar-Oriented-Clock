@@ -1,24 +1,21 @@
 Solar-Oriented Clock
-By Alexander Davis
+By Quarterturn
 Copyright 2011
 Free License for Non-Commercial Use
 github@matrixwide.com
-
-NOTE
-Updated button library to Bounce.h.
 
 Description:
 A clock which adjusts for DST per user-configurable schedule, computes sunrise, sunset and noon based on the long and lat coordinates and also displays the current moon phase.
 
 Software:
-Arduino 0022
+Arduino 1.0
 
 External Libraries:
 #include <avr/pgmspace.h>
 // for using atmega eeprom
 #include <EEPROM.h>
 // debounced button library
-#include <Bounce.h>
+#include <Bounce.h> v 1.6
 // for LCD
 #include <LiquidCrystal.h>
 // for using i2c interface
