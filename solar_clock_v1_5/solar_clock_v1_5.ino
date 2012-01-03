@@ -248,8 +248,8 @@ prog_char menu3[] PROGMEM = "SET DISPLAY SCHEDULE";
 prog_char menu4[] PROGMEM = "SET 12/24 HR MODE";
 prog_char menu5[] PROGMEM = "SET DEFAULTS";
 prog_char menu6[] PROGMEM = "DONE";
-prog_char menu7[] PROGMEM = "Solar Clock    1.4";
-prog_char menu8[] PROGMEM = "Alex Davis 9/12/11";
+prog_char menu7[] PROGMEM = "Solar Clock    1.5";
+prog_char menu8[] PROGMEM = "Alex Davis 1/2/2012";
 
 // an array of menu strings stored in FLASH
 PROGMEM  const char *menuStrSet[] = {
@@ -346,8 +346,8 @@ void setup()
   // idea to make sure.
   Wire.begin();
   Wire.beginTransmission(DS3231_I2C_ADDRESS); // address DS3231
-  Wire.send(0x0E); // select register
-  Wire.send(0b00011100); // write register bitmap, bit 7 is /EOSC
+  Wire.write(0x0E); // select register
+  Wire.write(0b00011100); // write register bitmap, bit 7 is /EOSC
   Wire.endTransmission();
 
   // enable the SQW pin output
@@ -1967,11 +1967,11 @@ void setDate()
   // 5 year
   
   Wire.beginTransmission(DS3231_I2C_ADDRESS);
-  Wire.send(3);
-  Wire.send(decToBcd(day));
-  Wire.send(decToBcd(theTime[3]));
-  Wire.send(decToBcd(theTime[4]));
-  Wire.send(decToBcd(theTime[5]));
+  Wire.write(3);
+  Wire.write(decToBcd(day));
+  Wire.write(decToBcd(theTime[3]));
+  Wire.write(decToBcd(theTime[4]));
+  Wire.write(decToBcd(theTime[5]));
   Wire.endTransmission();
 }
 
@@ -1991,15 +1991,15 @@ void getDate()
   // 5 year
   
   Wire.beginTransmission(DS3231_I2C_ADDRESS);
-  Wire.send(3); //set register to 3 (day)
+  Wire.write(3); //set register to 3 (day)
   Wire.endTransmission();
   Wire.requestFrom(DS3231_I2C_ADDRESS, 4); //get 5 bytes (day,date,month,year,control)
   while(Wire.available())
   {
-    day = bcdToDec(Wire.receive());
-    theTime[3] = bcdToDec(Wire.receive());
-    theTime[4] = bcdToDec(Wire.receive());
-    theTime[5] = bcdToDec(Wire.receive());
+    day = bcdToDec(Wire.read());
+    theTime[3] = bcdToDec(Wire.read());
+    theTime[4] = bcdToDec(Wire.read());
+    theTime[5] = bcdToDec(Wire.read());
   }
 }
 
@@ -2019,10 +2019,10 @@ void setTime()
   // 5 year
   
   Wire.beginTransmission(DS3231_I2C_ADDRESS);
-  Wire.send(0);
-  Wire.send(decToBcd(theTime[0]));
-  Wire.send(decToBcd(theTime[1]));
-  Wire.send(decToBcd(theTime[2]));
+  Wire.write((byte)0x0);
+  Wire.write(decToBcd(theTime[0]));
+  Wire.write(decToBcd(theTime[1]));
+  Wire.write(decToBcd(theTime[2]));
   Wire.endTransmission();
 }
 
@@ -2042,14 +2042,14 @@ void getTime()
   // 5 year
   
   Wire.beginTransmission(DS3231_I2C_ADDRESS);
-  Wire.send(0); //set register to 0
+  Wire.write((byte)0x0); //set register to 0
   Wire.endTransmission();
   Wire.requestFrom(DS3231_I2C_ADDRESS, 3); //get 3 bytes (seconds, minutes, hours)
   while(Wire.available())
   {
-    theTime[0] = bcdToDec(Wire.receive() & 0x7f);
-    theTime[1] = bcdToDec(Wire.receive());
-    theTime[2] = bcdToDec(Wire.receive() & 0x3f);
+    theTime[0] = bcdToDec(Wire.read() & 0x7f);
+    theTime[1] = bcdToDec(Wire.read());
+    theTime[2] = bcdToDec(Wire.read() & 0x3f);
   }
 }
 
@@ -2601,8 +2601,8 @@ byte bcdToDec(byte val)
 void SQWEnable()
 {
   Wire.beginTransmission(DS3231_I2C_ADDRESS);
-  Wire.send(0x0e);
-  Wire.send(0);
+  Wire.write(0x0e);
+  Wire.write((byte)0x0);
   Wire.endTransmission();
 }
 
